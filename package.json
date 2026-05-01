@@ -1,0 +1,62 @@
+{
+  "name": "@lorejump/cli",
+  "version": "0.0.1",
+  "description": "Cross-platform installer for LoreJump skill+MCP — install/doctor/update across Claude Code, Cursor, Trae, VS Code, Codex CLI and more.",
+  "type": "module",
+  "bin": {
+    "lorejump": "./dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "files": [
+    "dist",
+    "scripts/install.sh",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist coverage .vitest-cache"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@iarna/toml": "^2.2.5",
+    "commander": "^12.1.0",
+    "jsonc-parser": "^3.3.1",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "keywords": [
+    "lorejump",
+    "cli",
+    "installer",
+    "claude-code",
+    "skill",
+    "mcp",
+    "agent"
+  ],
+  "author": "LoreJump",
+  "license": "MIT",
+  "homepage": "https://lorejump.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LoreJump/lorejump-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LoreJump/lorejump-cli/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
