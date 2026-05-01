@@ -6,6 +6,8 @@ import { doctor } from "./commands/doctor.js";
 import { update } from "./commands/update.js";
 import { runVersionNudge } from "./version-check.js";
 
+// createRequire resolves relative to the bundled file (dist/cli.js after tsup),
+// not src/cli.ts — so `../package.json` lands on lorejump-cli/package.json.
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
 

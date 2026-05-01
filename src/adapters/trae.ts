@@ -2,7 +2,23 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Adapter, AdapterContext, McpEntry } from "./_types.js";
 import type { SkillName } from "../constants.js";
+import { SKILL_NAMES } from "../constants.js";
+import { safeWrite } from "../utils/fs-safe.js";
+import { mergeJsonEntry } from "../utils/json-merge.js";
 
+/**
+ * Trae adapter (字节跳动).
+ *
+ * C2 schema trap: Trae rejects lowercase `skill.md` even when the host
+ * filesystem is case-insensitive. The string literal "SKILL.md" below
+ * MUST stay uppercase. CI runs on Linux to catch lowercase regressions
+ * (case-sensitive filesystem turns a typo into a hard fail).
+ *
+ * Probe:    <cwd>/.trae/
+ * Skill:    .trae/skills/<name>/SKILL.md  (literal uppercase)
+ * MCP:      .trae/mcp.json
+ * Root key: mcpServers
+ */
 export const trae: Adapter = {
   id: "trae",
   displayName: "Trae (字节)",
@@ -13,22 +29,31 @@ export const trae: Adapter = {
   },
 
   async installSkills(
-    _ctx: AdapterContext,
-    _skills: Record<SkillName, string>,
+    ctx: AdapterContext,
+    skills: Record<SkillName, string>,
   ): Promise<string[]> {
-    // C2 schema trap: filename MUST be exactly "SKILL.md" (uppercase),
-    // not "skill.md" — Trae is case-sensitive on this even on case-insensitive FS.
-    // CI must run on Linux to catch lowercase regressions.
-    // TODO: write to .trae/skills/<name>/SKILL.md
-    throw new Error("trae installSkills not yet implemented");
+    const written: string[] = [];
+    for (const name of SKILL_NAMES) {
+      // Filename must remain uppercase "SKILL.md" — Trae C2 schema trap.
+      const path = join(ctx.cwd, ".trae", "skills", name, "SKILL.md");
+      await safeWrite(path, skills[name]);
+      written.push(path);
+    }
+    return written;
   },
 
   async installMcp(
-    _ctx: AdapterContext,
-    _name: string,
-    _entry: McpEntry,
+    ctx: AdapterContext,
+    name: string,
+    entry: McpEntry,
   ): Promise<{ configPath: string; preservedExisting: string[] }> {
-    // TODO: merge into Trae MCP config; root key: mcpServers
-    throw new Error("trae installMcp not yet implemented");
+    const configPath = join(ctx.cwd, ".trae", "mcp.json");
+    const result = await mergeJsonEntry({
+      path: configPath,
+      rootKey: "mcpServers",
+      entryName: name,
+      entryValue: { url: entry.url },
+    });
+    return { configPath, preservedExisting: result.preservedExisting };
   },
 };
