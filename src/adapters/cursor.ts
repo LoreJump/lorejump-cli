@@ -18,6 +18,8 @@ export const cursor: Adapter = {
   id: "cursor",
   displayName: "Cursor",
   admission: ["C1"],
+  mcpRootKey: "mcpServers",
+  mcpFormat: "json",
 
   async probe(ctx: AdapterContext): Promise<boolean> {
     return existsSync(join(ctx.cwd, ".cursor"));

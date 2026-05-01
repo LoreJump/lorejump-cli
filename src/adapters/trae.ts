@@ -23,6 +23,8 @@ export const trae: Adapter = {
   id: "trae",
   displayName: "Trae (字节)",
   admission: ["C1", "C2"],
+  mcpRootKey: "mcpServers",
+  mcpFormat: "json",
 
   async probe(ctx: AdapterContext): Promise<boolean> {
     return existsSync(join(ctx.cwd, ".trae"));

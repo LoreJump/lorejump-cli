@@ -1,8 +1,11 @@
 import { stat, readFile } from "node:fs/promises";
 import pc from "picocolors";
 import { parse, type ParseError } from "jsonc-parser";
+import toml from "@iarna/toml";
+import yaml from "js-yaml";
 import { MCP_SERVER_URL } from "../constants.js";
 import { readInstallLog } from "../install-log.js";
+import type { McpFormat } from "../adapters/_types.js";
 
 export interface DoctorOptions {
   skipVersionCheck?: boolean;
@@ -33,7 +36,16 @@ export async function doctor(_opts: DoctorOptions): Promise<void> {
     for (const p of target.skill_paths) {
       all.push(printCheck(await checkFileExists(p, "skill")));
     }
-    all.push(printCheck(await checkMcpConfig(target.mcp_config_path, target.preserved_existing)));
+    all.push(
+      printCheck(
+        await checkMcpConfig(
+          target.mcp_config_path,
+          target.preserved_existing,
+          target.mcp_root_key ?? "mcpServers",
+          target.mcp_format ?? "json",
+        ),
+      ),
+    );
     console.log("");
   }
 
@@ -76,6 +88,8 @@ async function checkFileExists(path: string, kind: string): Promise<CheckResult>
 async function checkMcpConfig(
   path: string,
   preservedExisting: string[],
+  rootKey: string,
+  format: McpFormat,
 ): Promise<CheckResult> {
   let raw: string;
   try {
@@ -83,14 +97,25 @@ async function checkMcpConfig(
   } catch {
     return { ok: false, label: `mcp config: ${path}`, detail: "missing" };
   }
-  const errors: ParseError[] = [];
-  const parsed = parse(raw, errors, { allowTrailingComma: true });
-  if (errors.length > 0) {
-    return { ok: false, label: `mcp config: ${path}`, detail: "invalid JSON" };
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = parseMcpConfig(raw, format);
+  } catch (err) {
+    return {
+      ok: false,
+      label: `mcp config: ${path}`,
+      detail: `invalid ${format.toUpperCase()}: ${(err as Error).message}`,
+    };
   }
-  const servers = (parsed?.mcpServers ?? {}) as Record<string, unknown>;
+
+  const servers = (parsed?.[rootKey] ?? {}) as Record<string, unknown>;
   if (!("lorejump" in servers)) {
-    return { ok: false, label: `mcp config: ${path}`, detail: "lorejump entry missing" };
+    return {
+      ok: false,
+      label: `mcp config: ${path}`,
+      detail: `lorejump entry missing under "${rootKey}" key`,
+    };
   }
   const stillThere = preservedExisting.filter((n) => n in servers);
   if (stillThere.length !== preservedExisting.length) {
@@ -106,9 +131,25 @@ async function checkMcpConfig(
     label: `mcp config: ${path}`,
     detail:
       preservedExisting.length > 0
-        ? `lorejump + ${preservedExisting.length} preserved`
-        : `lorejump entry present`,
+        ? `lorejump + ${preservedExisting.length} preserved (${format})`
+        : `lorejump entry present (${format})`,
   };
+}
+
+function parseMcpConfig(raw: string, format: McpFormat): Record<string, unknown> {
+  if (format === "json") {
+    const errors: ParseError[] = [];
+    const parsed = parse(raw, errors, { allowTrailingComma: true });
+    if (errors.length > 0) throw new Error(`${errors.length} parse error(s)`);
+    return (parsed ?? {}) as Record<string, unknown>;
+  }
+  if (format === "toml") {
+    return toml.parse(raw) as Record<string, unknown>;
+  }
+  // yaml
+  const loaded = yaml.load(raw);
+  if (!loaded || typeof loaded !== "object") return {};
+  return loaded as Record<string, unknown>;
 }
 
 async function checkMcpEndpoint(): Promise<CheckResult> {

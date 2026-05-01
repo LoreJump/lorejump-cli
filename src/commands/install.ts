@@ -73,6 +73,8 @@ export async function install(opts: InstallOptions): Promise<void> {
     agent: chosen.id,
     skillPaths,
     mcpConfigPath: mcp.configPath,
+    mcpRootKey: chosen.mcpRootKey,
+    mcpFormat: chosen.mcpFormat,
     preservedExisting: mcp.preservedExisting,
   });
 
@@ -89,6 +91,8 @@ async function persistInstallLog(args: {
   agent: string;
   skillPaths: string[];
   mcpConfigPath: string;
+  mcpRootKey: string;
+  mcpFormat: "json" | "toml" | "yaml";
   preservedExisting: string[];
 }): Promise<void> {
   await ensureInstallLogDir();
@@ -105,6 +109,8 @@ async function persistInstallLog(args: {
     skill_hashes: skillHashes,
     mcp_config_path: args.mcpConfigPath,
     mcp_entry_name: "lorejump",
+    mcp_root_key: args.mcpRootKey,
+    mcp_format: args.mcpFormat,
     preserved_existing: args.preservedExisting,
   };
 

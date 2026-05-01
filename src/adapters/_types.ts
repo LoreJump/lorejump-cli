@@ -9,12 +9,17 @@ export interface AdapterContext {
   homedir: string;
 }
 
+export type McpFormat = "json" | "toml" | "yaml";
+
 export interface InstalledTarget {
   agent: string;
   skill_paths: string[];
   skill_hashes: Record<SkillName, string>;
   mcp_config_path: string;
   mcp_entry_name: string;
+  /** New in 0.1.0-alpha.1 — optional for backward-compat with older logs */
+  mcp_root_key?: string;
+  mcp_format?: McpFormat;
   preserved_existing: string[];
 }
 
@@ -25,6 +30,10 @@ export interface Adapter {
   readonly displayName: string;
   /** Stable id used for --tool=<name> */
   readonly id: string;
+  /** Top-level key under which MCP servers are listed (varies by agent — vscode uses "servers", others "mcpServers", codex/hermes "mcp_servers") */
+  readonly mcpRootKey: string;
+  /** Config file format — JSON for most, TOML for codex, YAML for hermes */
+  readonly mcpFormat: McpFormat;
 
   probe(ctx: AdapterContext): Promise<boolean>;
 

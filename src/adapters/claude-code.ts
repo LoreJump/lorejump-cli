@@ -21,6 +21,8 @@ export const claudeCode: Adapter = {
   id: "claude-code",
   displayName: "Claude Code",
   admission: ["C1"],
+  mcpRootKey: "mcpServers",
+  mcpFormat: "json",
 
   async probe(ctx: AdapterContext): Promise<boolean> {
     return (

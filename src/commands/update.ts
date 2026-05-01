@@ -1,11 +1,14 @@
 import { readFile } from "node:fs/promises";
 import pc from "picocolors";
 import { parse, type ParseError } from "jsonc-parser";
+import toml from "@iarna/toml";
+import yaml from "js-yaml";
 import { MCP_SERVER_URL, SKILL_NAMES } from "../constants.js";
 import { SKILL_CONTENT } from "../content/skills.js";
 import { readInstallLog, writeInstallLog, type InstallLog } from "../install-log.js";
 import { safeWrite, sha256 } from "../utils/fs-safe.js";
 import { createRequire } from "node:module";
+import type { McpFormat } from "../adapters/_types.js";
 
 export interface UpdateOptions {
   yes?: boolean;
@@ -77,7 +80,11 @@ export async function update(_opts: UpdateOptions): Promise<void> {
       }
     }
 
-    const userPreserved = await checkUserCustomization(target.mcp_config_path);
+    const userPreserved = await checkUserCustomization(
+      target.mcp_config_path,
+      target.mcp_root_key ?? "mcpServers",
+      target.mcp_format ?? "json",
+    );
     if (userPreserved) {
       console.log(
         pc.yellow(
@@ -111,15 +118,32 @@ export async function update(_opts: UpdateOptions): Promise<void> {
   );
 }
 
-async function checkUserCustomization(configPath: string): Promise<boolean> {
+async function checkUserCustomization(
+  configPath: string,
+  rootKey: string,
+  format: McpFormat,
+): Promise<boolean> {
   try {
     const raw = await readFile(configPath, "utf-8");
-    const errors: ParseError[] = [];
-    const parsed = parse(raw, errors, { allowTrailingComma: true });
-    if (errors.length > 0) return false;
-    const entry = parsed?.mcpServers?.lorejump;
+    let parsed: Record<string, unknown> = {};
+    if (format === "json") {
+      const errors: ParseError[] = [];
+      const p = parse(raw, errors, { allowTrailingComma: true });
+      if (errors.length > 0) return false;
+      parsed = (p ?? {}) as Record<string, unknown>;
+    } else if (format === "toml") {
+      parsed = toml.parse(raw) as Record<string, unknown>;
+    } else {
+      const loaded = yaml.load(raw);
+      if (loaded && typeof loaded === "object") parsed = loaded as Record<string, unknown>;
+    }
+    const entry = (parsed?.[rootKey] as Record<string, unknown>)?.lorejump as
+      | Record<string, unknown>
+      | undefined;
     if (!entry || typeof entry !== "object") return false;
-    return entry.url !== MCP_SERVER_URL;
+    // Both `url` (most agents) and `httpUrl` (qwen) count as the canonical URL.
+    const writtenUrl = (entry.url ?? entry.httpUrl) as string | undefined;
+    return writtenUrl !== undefined && writtenUrl !== MCP_SERVER_URL;
   } catch {
     return false;
   }
