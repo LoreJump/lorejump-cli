@@ -64,7 +64,8 @@ export const windsurf: Adapter = {
       path: configPath,
       rootKey: "mcpServers",
       entryName: name,
-      entryValue: { url: entry.url },
+      // type:"http" — MCP Streamable HTTP standard; missing type defaults to stdio.
+      entryValue: { type: "http", url: entry.url },
     });
     return { configPath, preservedExisting: result.preservedExisting };
   },

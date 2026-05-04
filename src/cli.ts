@@ -20,7 +20,7 @@ program
 
 program
   .command("install")
-  .description("Detect agent and install LoreJump skill+MCP")
+  .description("Detect agent and install LoreJump skill+MCP (writes to user scope by default)")
   .option("--tool <name>", "Force a specific preset adapter or 'handoff'")
   .option("--yes", "Skip TUI confirmation (non-interactive)")
   .option("--skip-version-check", "Skip L1 latest.json fetch")
@@ -31,7 +31,8 @@ program
 
 program
   .command("doctor")
-  .description("Verify install integrity (paths, schema, MCP endpoint)")
+  .description("Verify install integrity. Pipe --json to your AI agent for self-driven repair.")
+  .option("--json", "Emit machine-readable JSON for agent consumption (schema: lorejump-doctor-v1)")
   .option("--skip-version-check", "Skip L1 latest.json fetch")
   .action(async (opts) => {
     await doctor(opts);

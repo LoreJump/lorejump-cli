@@ -58,13 +58,14 @@ describe("cline adapter", () => {
     }
   });
 
-  it("writes MCP to global cline_mcp_settings.json (not project)", async () => {
+  it("writes MCP to global cline_mcp_settings.json with type:streamableHttp", async () => {
     const result = await cline.installMcp({ cwd: tmp, homedir: fakeHome }, "lorejump", { url: MCP_URL });
     expect(result.configPath).toContain("cline_mcp_settings.json");
     expect(result.configPath).toContain("saoudrizwan.claude-dev");
     expect(result.configPath).toContain(fakeHome); // global, in homedir
     const after = JSON.parse(await readFile(result.configPath, "utf-8"));
     expect(after.mcpServers.lorejump.url).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.type).toBe("streamableHttp"); // Cline-specific field name
   });
 });
 
@@ -115,13 +116,14 @@ describe("windsurf adapter", () => {
     expect(paths.every((p) => p.includes("/.windsurf/rules/"))).toBe(true);
   });
 
-  it("writes MCP to ~/.codeium/windsurf/mcp_config.json (not .windsurf/)", async () => {
+  it("writes MCP to ~/.codeium/windsurf/mcp_config.json with type:http", async () => {
     const result = await windsurf.installMcp({ cwd: tmp, homedir: fakeHome }, "lorejump", { url: MCP_URL });
     expect(result.configPath).toBe(
       join(fakeHome, ".codeium", "windsurf", "mcp_config.json"),
     );
     const after = JSON.parse(await readFile(result.configPath, "utf-8"));
     expect(after.mcpServers.lorejump.url).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.type).toBe("http");
   });
 });
 
@@ -139,11 +141,12 @@ describe("codebuddy adapter", () => {
     expect(paths.every((p) => p.includes("/.codebuddy/agents/"))).toBe(true);
   });
 
-  it("writes MCP to .codebuddy/.mcp.json (leading dot)", async () => {
+  it("writes MCP to .codebuddy/.mcp.json with type:http", async () => {
     const result = await codebuddy.installMcp({ cwd: tmp, homedir: fakeHome }, "lorejump", { url: MCP_URL });
     expect(result.configPath).toMatch(/\/\.codebuddy\/\.mcp\.json$/);
     const after = JSON.parse(await readFile(result.configPath, "utf-8"));
     expect(after.mcpServers.lorejump.url).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.type).toBe("http");
   });
 });
 
@@ -192,11 +195,12 @@ describe("kimi-cli adapter", () => {
     }
   });
 
-  it("MCP path is ~/.kimi/mcp.json (separate from config.toml)", async () => {
+  it("MCP path is ~/.kimi/mcp.json (separate from config.toml) with type:http", async () => {
     const result = await kimiCli.installMcp({ cwd: tmp, homedir: fakeHome }, "lorejump", { url: MCP_URL });
     expect(result.configPath).toBe(join(fakeHome, ".kimi", "mcp.json"));
     const after = JSON.parse(await readFile(result.configPath, "utf-8"));
     expect(after.mcpServers.lorejump.url).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.type).toBe("http");
   });
 });
 

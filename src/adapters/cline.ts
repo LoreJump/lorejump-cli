@@ -99,7 +99,10 @@ export const cline: Adapter = {
       path: configPath,
       rootKey: "mcpServers",
       entryName: name,
-      entryValue: { url: entry.url },
+      // Cline uses `type: "streamableHttp"` for HTTP MCP entries (per
+      // docs.cline.bot/mcp/configuring-mcp-servers). Without it Cline
+      // defaults to stdio and tries to exec the URL.
+      entryValue: { type: "streamableHttp", url: entry.url },
     });
     return { configPath, preservedExisting: result.preservedExisting };
   },

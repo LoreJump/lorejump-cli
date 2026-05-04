@@ -75,20 +75,102 @@ get_sota_pack({
 **降级处理（MCP 未连接）**：调用失败、tool 不存在、连接超时 → 立即输出错误卡片并终止流程，**不要尝试内建 rubric**：
 
 ```
-⚠️ 逻辑跃迁 MCP Server 未连接
+⚠️ 逻辑跃迁 MCP 工具未在本 session 加载。
 
-本 skill 依赖 MCP 后端（lorejump-mcp）下发 SOTA 画像，无法独立运行。
+agent 自查（推荐路径）：
+  1. 跑 `npx @lorejump/cli@alpha doctor --json` 拿现场快照
+  2. 解析 JSON 的 checks[] 找 status=fail
+  3. 对照下面"诊断决策树"做修复决策
+  4. 仍解决不了，按 agent_handoff.ide_official_docs_for_handoff[] 给的 URL
+     用 WebFetch 读官方文档查解决方案
 
-一键安装（推荐，含 skill + MCP）：
-  /plugin marketplace add LoreJump/claude-plugins
-  /plugin install lorejump-optimize@lorejump
-  /reload-plugins
+人类自查（无 agent 时）：
+  npx @lorejump/cli@alpha doctor       # 彩色人类输出
+  # 输出末尾会指引怎么读决策树或喂给 AI agent
 
-或仅连接 MCP：
-  claude mcp add --transport http lorejump https://mcp.lorejump.com/mcp
+如果还没装：
+  curl -fsSL https://lorejump.com/install.sh | bash
+  # 或仅装 MCP 到 user scope
+  claude mcp add --transport http lorejump https://mcp.lorejump.com/mcp -s user
 
-安装后请重新运行 /lorejump-optimize。
+修完后重启 IDE，再跑 /lorejump-optimize。
 ```
+
+### 诊断决策树（agent 兜底用，三层信息源）
+
+**先看本节决策树（前 90% 故障覆盖）→ 再查 lorejump 自家 docs（lorejump-specific）→ 最后查 IDE 官方 docs（schema 演进时优先信这里）。**
+
+**doctor `--json` 输出 schema**（`schema: lorejump-doctor-v1`）：
+
+```jsonc
+{
+  "schema": "lorejump-doctor-v1",
+  "cli_version": "...",
+  "checks": [
+    {
+      "id": "skill_file" | "mcp_config" | "endpoint_health" | "mcp_handshake",
+      "status": "ok" | "fail",
+      "label": "...",
+      "detail": "...",
+      "observation": { /* 现场事实 */ },
+      "hypothesis": [ /* 候选解释，agent 自排 */ ]
+    }
+  ],
+  "agent_handoff": {
+    "failed_check_ids": [...],
+    "skill_path": ".claude/skills/lorejump-optimize/SKILL.md",
+    "ide_official_docs_for_handoff": [...URLs...],
+    "lorejump_self_docs": [...URLs...]
+  }
+}
+```
+
+**5 类常见故障的判别 + 修复**：
+
+#### 故障 A：`mcp_config` fail，entry 有 url 但缺 transport 标识字段
+- **现场**：`observation.entry_keys` 只有 `["url"]`，无 `type` / `httpUrl` / `command`
+- **原因**：远程 MCP 必须显式指明 transport，缺则 IDE 默认 stdio 把 URL 当 command 执行
+- **修复**：Edit `observation.path`，给 lorejump entry 加对应 IDE 的 transport 字段：
+
+| IDE (`agent_id`) | 应加的字段 |
+|---|---|
+| claude-code / cursor / kimi-cli / trae / windsurf / codebuddy / vscode | `"type": "http"` |
+| cline | `"type": "streamableHttp"` |
+| roo-code | `"type": "streamable-http"` |
+| qwen-code | 把 `url` 改名为 `httpUrl`（不是加字段，是改字段名） |
+| codex (TOML) / hermes (YAML) | 不加 type，依协议自动推断 |
+
+修完让用户**重启 IDE**（IDE 进程缓存旧配置），再跑一次 doctor。
+
+#### 故障 B：`mcp_handshake` fail 但 `endpoint_health` ok
+- **现场**：server 返回 serverInfo OK，但 client 看不到 lorejump tools
+- **可能原因**（按 hypothesis 字段排序）：
+  1. `client_did_not_load_config` — 项目级 `.mcp.json` 未 trust（Claude Code 启动弹窗被 dismiss）。让用户检查 `~/.claude.json.projects[$PWD].enabledMcpjsonServers` 是否含 `"lorejump"`，不含则重启 IDE 接受 trust，或建议用户改 user scope 重装：
+     ```
+     claude mcp add --transport http lorejump https://mcp.lorejump.com/mcp -s user
+     ```
+  2. `client_cached_old_config_needs_restart` — 让用户完全关闭 IDE（不只是 reload window）再开
+  3. `client_loaded_config_but_transport_field_wrong` — 同故障 A，但用户改完没重启
+
+#### 故障 C：`endpoint_health` fail
+- **现场**：HTTP 5xx 或网络超时
+- **原因**：server 端问题或用户网络
+- **修复**：让用户去 `https://lorejump.com/docs/troubleshooting` 看是否有 status incident；不行换网络（如 VPN / 国内出海路线问题）
+
+#### 故障 D：`mcp_config` fail，根 key 不对
+- **现场**：`observation.servers_present` 是空，但 `observation.root_keys_present` 含其他 key（如 VS Code 用 `servers` 而 doctor 找 `mcpServers`）
+- **原因**：用户从别的 IDE 复制了配置文件，根 key 名不匹配
+- **修复**：跑 `lorejump install --tool=<正确的 IDE>` 重装；不要手动改根 key（不同 IDE 真会用不同 key）
+
+#### 故障 E：`skill_file` fail
+- **现场**：skill 文件不存在或太小
+- **修复**：重装 `npx @lorejump/cli@alpha install --tool=<agent_id>`
+
+### Edit 文件时的安全准则
+- 走 Read → 显示 diff → 用户审批 → Edit 标准流程
+- **不要**自动改用户故意修改过的 entry（看 git blame 或问用户）
+- 改后**必须**让用户重启 IDE 才生效（IDE 缓存配置在内存）
+- 重启后让用户再跑一次 `lorejump doctor` 确认全 pass
 
 `tier: "public"` 时正常出分但末尾展示 `upgrade_cta`，**不发 R1 报告**（隐私 / 滥用门槛）。
 

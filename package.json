@@ -1,6 +1,6 @@
 {
   "name": "@lorejump/cli",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Cross-platform installer for LoreJump skill+MCP — install/doctor/update across Claude Code, Cursor, Trae, VS Code, Codex CLI and more.",
   "type": "module",
   "bin": {

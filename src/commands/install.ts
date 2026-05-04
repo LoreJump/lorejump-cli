@@ -17,6 +17,7 @@ export interface InstallOptions {
   tool?: string;
   yes?: boolean;
   skipVersionCheck?: boolean;
+  scope?: "user" | "project";
 }
 
 // Bundled to dist/cli.js — package.json lives one level up at runtime.
@@ -24,7 +25,8 @@ const require = createRequire(import.meta.url);
 const { version: CLI_VERSION } = require("../package.json") as { version: string };
 
 export async function install(opts: InstallOptions): Promise<void> {
-  const ctx: AdapterContext = { cwd: process.cwd(), homedir: homedir() };
+  const scope: "user" | "project" = opts.scope ?? "user";
+  const ctx: AdapterContext = { cwd: process.cwd(), homedir: homedir(), scope };
 
   if (opts.tool === "handoff") {
     await runHandoff();
@@ -58,7 +60,7 @@ export async function install(opts: InstallOptions): Promise<void> {
     }
   }
 
-  console.log(pc.bold(`📦 Installing LoreJump for ${chosen.displayName}...`));
+  console.log(pc.bold(`📦 Installing LoreJump for ${chosen.displayName} (scope: ${scope})...`));
 
   const skillPaths = await chosen.installSkills(ctx, SKILL_CONTENT);
   for (const p of skillPaths) console.log(pc.green(`   ✓ skill: ${p}`));
@@ -76,10 +78,54 @@ export async function install(opts: InstallOptions): Promise<void> {
     mcpRootKey: chosen.mcpRootKey,
     mcpFormat: chosen.mcpFormat,
     preservedExisting: mcp.preservedExisting,
+    scope,
   });
 
   console.log("");
-  console.log(pc.bold("✅ Done.") + pc.dim("  Verify: lorejump doctor"));
+  console.log(pc.bold("✅ Done."));
+  console.log("");
+  printNextSteps(chosen.id, scope, mcp.configPath);
+}
+
+function printNextSteps(
+  agentId: string,
+  scope: "user" | "project",
+  configPath: string,
+): void {
+  console.log(pc.bold("Next steps:"));
+
+  if (agentId === "claude-code") {
+    if (scope === "user") {
+      console.log("  1. Restart Claude Code (close and reopen). User-scope MCP loads on next launch.");
+      console.log("  2. Verify: " + pc.cyan("claude mcp list") + "  — lorejump should appear.");
+      console.log("  3. In any project: " + pc.cyan("/lorejump-optimize"));
+    } else {
+      console.log("  1. Restart Claude Code in this directory.");
+      console.log("  2. On startup it will ask " + pc.dim('"Trust .mcp.json from this project?"') + " — accept it.");
+      console.log("  3. Verify: " + pc.cyan("claude mcp list") + "  — lorejump should appear.");
+      console.log("  4. Run: " + pc.cyan("/lorejump-optimize"));
+      console.log("");
+      console.log(pc.dim("  Tip: --scope=user installs to ~/.claude.json for all projects"));
+      console.log(pc.dim("       and skips the per-project trust prompt."));
+    }
+  } else if (agentId === "cursor") {
+    console.log("  1. Restart Cursor.");
+    console.log("  2. Settings → MCP → confirm " + pc.cyan("lorejump") + " is listed and green.");
+    console.log("  3. In chat: " + pc.cyan("/lorejump-optimize"));
+  } else if (agentId === "vscode") {
+    console.log("  1. Reload VS Code (Cmd/Ctrl+Shift+P → 'Developer: Reload Window').");
+    console.log("  2. Copilot Chat → enable Agent mode → MCP servers should show " + pc.cyan("lorejump") + ".");
+    console.log("  3. " + pc.cyan("@workspace /lorejump-optimize"));
+  } else if (agentId === "codex" || agentId === "hermes" || agentId === "kimi-cli") {
+    console.log("  1. Restart your agent (it reads MCP config on startup).");
+    console.log("  2. Trigger: " + pc.cyan("/lorejump-optimize"));
+  } else {
+    console.log("  1. Restart your agent so it picks up the new MCP entry.");
+    console.log("  2. Trigger: " + pc.cyan("/lorejump-optimize"));
+  }
+  console.log("");
+  console.log(pc.dim("  Verify install:  ") + pc.cyan("lorejump doctor"));
+  console.log(pc.dim("  Config path:     " + configPath));
 }
 
 async function runHandoff(): Promise<void> {
@@ -94,6 +140,7 @@ async function persistInstallLog(args: {
   mcpRootKey: string;
   mcpFormat: "json" | "toml" | "yaml";
   preservedExisting: string[];
+  scope: "user" | "project";
 }): Promise<void> {
   await ensureInstallLogDir();
   const now = new Date().toISOString();
@@ -112,6 +159,8 @@ async function persistInstallLog(args: {
     mcp_root_key: args.mcpRootKey,
     mcp_format: args.mcpFormat,
     preserved_existing: args.preservedExisting,
+    scope: args.scope,
+    cli_version_at_install: CLI_VERSION,
   };
 
   const log: InstallLog = existing

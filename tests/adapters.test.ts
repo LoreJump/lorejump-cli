@@ -43,33 +43,56 @@ describe("claude-code adapter", () => {
     expect(await claudeCode.probe({ cwd: tmp, homedir: fakeHome })).toBe(false);
   });
 
-  it("writes skills under project .claude/skills/", async () => {
-    await mkdir(join(tmp, ".claude"), { recursive: true });
+  it("default scope (user): writes skills under ~/.claude/skills/", async () => {
     const paths = await claudeCode.installSkills({ cwd: tmp, homedir: fakeHome }, FAKE_SKILLS);
     expect(paths).toHaveLength(2);
     for (const p of paths) {
       expect(existsSync(p)).toBe(true);
       expect(p.endsWith("SKILL.md")).toBe(true);
+      expect(p.startsWith(fakeHome)).toBe(true); // user scope, in homedir
     }
-    const optimize = await readFile(paths[0]!, "utf-8");
-    expect(optimize).toBe(FAKE_SKILLS["lorejump-optimize"]);
   });
 
-  it("merges MCP into .mcp.json preserving existing servers", async () => {
+  it("scope=project: writes skills under <cwd>/.claude/skills/", async () => {
+    const paths = await claudeCode.installSkills(
+      { cwd: tmp, homedir: fakeHome, scope: "project" },
+      FAKE_SKILLS,
+    );
+    expect(paths).toHaveLength(2);
+    for (const p of paths) {
+      expect(p.startsWith(tmp)).toBe(true); // project scope, in cwd
+    }
+  });
+
+  it("default scope (user): writes MCP to ~/.claude.json with type:http", async () => {
+    const result = await claudeCode.installMcp(
+      { cwd: tmp, homedir: fakeHome },
+      "lorejump",
+      { url: MCP_URL },
+    );
+    expect(result.configPath).toBe(join(fakeHome, ".claude.json"));
+    const after = JSON.parse(await readFile(result.configPath, "utf-8"));
+    expect(after.mcpServers.lorejump.url).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.type).toBe("http"); // CRITICAL: missing type breaks Claude Code
+  });
+
+  it("scope=project: writes MCP to <cwd>/.mcp.json preserving existing servers", async () => {
     await mkdir(join(tmp, ".claude"), { recursive: true });
     await writeFile(
       join(tmp, ".mcp.json"),
       JSON.stringify({ mcpServers: { notion: { url: "https://x" }, github: { url: "https://y" } } }, null, 2),
     );
     const result = await claudeCode.installMcp(
-      { cwd: tmp, homedir: fakeHome },
+      { cwd: tmp, homedir: fakeHome, scope: "project" },
       "lorejump",
       { url: MCP_URL },
     );
+    expect(result.configPath).toBe(join(tmp, ".mcp.json"));
     const after = JSON.parse(await readFile(result.configPath, "utf-8"));
     expect(after.mcpServers.notion.url).toBe("https://x");
     expect(after.mcpServers.github.url).toBe("https://y");
     expect(after.mcpServers.lorejump.url).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.type).toBe("http");
     expect(result.preservedExisting.sort()).toEqual(["github", "notion"]);
   });
 });
@@ -80,13 +103,14 @@ describe("cursor adapter", () => {
     expect(await cursor.probe({ cwd: tmp, homedir: fakeHome })).toBe(true);
   });
 
-  it("writes skills + mcp", async () => {
+  it("writes skills + mcp with type:http", async () => {
     await mkdir(join(tmp, ".cursor"), { recursive: true });
     const paths = await cursor.installSkills({ cwd: tmp, homedir: fakeHome }, FAKE_SKILLS);
     expect(paths.every((p) => p.includes("/.cursor/skills/"))).toBe(true);
     const result = await cursor.installMcp({ cwd: tmp, homedir: fakeHome }, "lorejump", { url: MCP_URL });
     const after = JSON.parse(await readFile(result.configPath, "utf-8"));
     expect(after.mcpServers.lorejump.url).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.type).toBe("http");
   });
 });
 

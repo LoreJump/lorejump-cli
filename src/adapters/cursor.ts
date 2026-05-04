@@ -48,7 +48,9 @@ export const cursor: Adapter = {
       path: configPath,
       rootKey: "mcpServers",
       entryName: name,
-      entryValue: { url: entry.url },
+      // type:"http" — Cursor follows MCP Streamable HTTP convention; missing
+      // type defaults to stdio and tries to exec the URL as a command.
+      entryValue: { type: "http", url: entry.url },
     });
     return { configPath, preservedExisting: result.preservedExisting };
   },

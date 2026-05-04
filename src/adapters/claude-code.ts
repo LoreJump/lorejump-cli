@@ -9,12 +9,17 @@ import { mergeJsonEntry } from "../utils/json-merge.js";
 /**
  * Claude Code adapter.
  *
- * Probe order:
- *   1) project: <cwd>/.claude/  → install at project scope
- *   2) user:    ~/.claude/       → fallback to user scope
+ * Default scope: USER (~/.claude/skills/* + ~/.claude.json mcpServers).
+ * Project scope (--scope=project) writes <cwd>/.claude/skills/* + <cwd>/.mcp.json,
+ * which then requires Claude Code's project-level trust prompt to enable
+ * (see ~/.claude.json.projects[cwd].enabledMcpjsonServers). User scope
+ * avoids that friction entirely and is the right default for solo developers.
+ *
+ * Probe (admission detection only — does NOT decide install path):
+ *   <cwd>/.claude/ exists OR ~/.claude/ exists
  *
  * Skill layout:   .claude/skills/<name>/SKILL.md
- * MCP layout:     .mcp.json (project) or ~/.claude.json (user)
+ * MCP layout:     ~/.claude.json (user, default) or .mcp.json (project)
  * Root key:       mcpServers
  */
 export const claudeCode: Adapter = {
@@ -51,24 +56,25 @@ export const claudeCode: Adapter = {
     name: string,
     entry: McpEntry,
   ): Promise<{ configPath: string; preservedExisting: string[] }> {
-    const base = pickClaudeBase(ctx);
-    const configPath =
-      base === join(ctx.cwd, ".claude")
-        ? join(ctx.cwd, ".mcp.json")
-        : join(ctx.homedir, ".claude.json");
+    const isProject = ctx.scope === "project";
+    const configPath = isProject
+      ? join(ctx.cwd, ".mcp.json")
+      : join(ctx.homedir, ".claude.json");
 
     const result = await mergeJsonEntry({
       path: configPath,
       rootKey: "mcpServers",
       entryName: name,
-      entryValue: { url: entry.url },
+      // type:"http" required — without it Claude Code defaults to stdio and
+      // tries to exec the URL as a command, silently failing.
+      entryValue: { type: "http", url: entry.url },
     });
     return { configPath, preservedExisting: result.preservedExisting };
   },
 };
 
 function pickClaudeBase(ctx: AdapterContext): string {
-  const projectDir = join(ctx.cwd, ".claude");
-  if (existsSync(projectDir)) return projectDir;
+  // Skill scope follows install scope. Default is user (~/.claude/skills/*).
+  if (ctx.scope === "project") return join(ctx.cwd, ".claude");
   return join(ctx.homedir, ".claude");
 }

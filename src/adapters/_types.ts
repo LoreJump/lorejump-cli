@@ -7,6 +7,14 @@ export interface McpEntry {
 export interface AdapterContext {
   cwd: string;
   homedir: string;
+  /**
+   * Install scope. "user" writes to the agent's user-level config (e.g.
+   * ~/.claude.json, ~/.cursor/), avoiding project-level trust prompts.
+   * "project" writes to <cwd>/.<agent>/. For agents with no project scope
+   * (cline, codex, hermes, windsurf MCP), this flag is ignored.
+   * Default: "user" (zero friction for solo developers).
+   */
+  scope?: "user" | "project";
 }
 
 export type McpFormat = "json" | "toml" | "yaml";
@@ -21,6 +29,10 @@ export interface InstalledTarget {
   mcp_root_key?: string;
   mcp_format?: McpFormat;
   preserved_existing: string[];
+  /** Where the install wrote — "user" (~/.<agent>/...) or "project" (<cwd>/.<agent>/...) */
+  scope?: "user" | "project";
+  /** CLI version recorded at install time (the parent log's cli_version updates on every install/update) */
+  cli_version_at_install?: string;
 }
 
 export interface Adapter {
