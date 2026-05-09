@@ -125,6 +125,10 @@ function printNextSteps(
     console.log("  1. Restart Gemini CLI (it reads ~/.gemini/settings.json on startup).");
     console.log("  2. Verify in CLI: list MCP servers — " + pc.cyan("lorejump") + " should appear.");
     console.log("  3. Trigger: " + pc.cyan("/lorejump-optimize"));
+  } else if (agentId === "qoder") {
+    console.log("  1. Restart QoderWork / Qoder IDE / qodercli (it reads ~/.qoder.json on startup).");
+    console.log("  2. Verify: " + pc.cyan("qodercli mcp list") + " — lorejump should appear.");
+    console.log("  3. In any QoderWork chat: " + pc.cyan("/lorejump-optimize"));
   } else if (agentId === "trae") {
     console.log("  1. Restart Trae IDE (close and reopen the window).");
     console.log("  2. Verify MCP " + pc.cyan("lorejump") + " is listed in Trae's MCP panel.");

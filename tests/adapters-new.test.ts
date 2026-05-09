@@ -15,6 +15,7 @@ import { kimiCli } from "../src/adapters/kimi-cli.js";
 import { qwenCode } from "../src/adapters/qwen-code.js";
 import { geminiCli } from "../src/adapters/gemini-cli.js";
 import { antigravity } from "../src/adapters/antigravity.js";
+import { qoder } from "../src/adapters/qoder.js";
 import { trae } from "../src/adapters/trae.js";
 import { codex } from "../src/adapters/codex.js";
 import { hermes } from "../src/adapters/hermes.js";
@@ -462,17 +463,81 @@ describe("trae adapter (user scope default + project scope via flag)", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
+// qoder — ~/.qoder/skills/* + ~/.qoder.json with type:streamable-http (hyphen!)
+// ─────────────────────────────────────────────────────────────────────────
+describe("qoder adapter (C2: type:streamable-http with hyphen)", () => {
+  it("probes via project .qoder/", async () => {
+    await mkdir(join(tmp, ".qoder"), { recursive: true });
+    expect(await qoder.probe({ cwd: tmp, homedir: fakeHome })).toBe(true);
+  });
+
+  it("probes via user ~/.qoder/", async () => {
+    await mkdir(join(fakeHome, ".qoder"), { recursive: true });
+    expect(await qoder.probe({ cwd: tmp, homedir: fakeHome })).toBe(true);
+  });
+
+  it("probes via existing ~/.qoder.json (no skills dir yet)", async () => {
+    await writeFile(join(fakeHome, ".qoder.json"), "{}");
+    expect(await qoder.probe({ cwd: tmp, homedir: fakeHome })).toBe(true);
+  });
+
+  it("default scope (user) writes ~/.qoder/skills/<name>/SKILL.md", async () => {
+    const paths = await qoder.installSkills({ cwd: tmp, homedir: fakeHome }, FAKE_SKILLS);
+    for (const p of paths) {
+      expect(p).toMatch(/\/\.qoder\/skills\/lorejump-(optimize|harness)\/SKILL\.md$/);
+      expect(p.startsWith(fakeHome)).toBe(true);
+    }
+  });
+
+  it("project scope writes <cwd>/.qoder/skills/", async () => {
+    const paths = await qoder.installSkills(
+      { cwd: tmp, homedir: fakeHome, scope: "project" },
+      FAKE_SKILLS,
+    );
+    for (const p of paths) {
+      expect(p.startsWith(tmp)).toBe(true);
+      expect(p).toMatch(/\/\.qoder\/skills\/lorejump-(optimize|harness)\/SKILL\.md$/);
+    }
+  });
+
+  it("MCP user-scope writes ~/.qoder.json with type:streamable-http (hyphen!)", async () => {
+    const result = await qoder.installMcp(
+      { cwd: tmp, homedir: fakeHome, scope: "user" },
+      "lorejump",
+      { url: MCP_URL },
+    );
+    expect(result.configPath).toBe(join(fakeHome, ".qoder.json"));
+    const after = JSON.parse(await readFile(result.configPath, "utf-8"));
+    expect(after.mcpServers.lorejump.url).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.type).toBe("streamable-http"); // hyphen!
+    expect(after.mcpServers.lorejump.type).not.toBe("streamableHttp"); // not cline-style
+    expect(after.mcpServers.lorejump.type).not.toBe("http"); // not claude-code-style
+  });
+
+  it("MCP project-scope writes <cwd>/.mcp.json", async () => {
+    const result = await qoder.installMcp(
+      { cwd: tmp, homedir: fakeHome, scope: "project" },
+      "lorejump",
+      { url: MCP_URL },
+    );
+    expect(result.configPath).toBe(join(tmp, ".mcp.json"));
+    const after = JSON.parse(await readFile(result.configPath, "utf-8"));
+    expect(after.mcpServers.lorejump.type).toBe("streamable-http");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
 // Cross-cutting: ADAPTERS array shape
 // ─────────────────────────────────────────────────────────────────────────
 describe("adapter registry shape", () => {
-  it("all 14 adapters have unique stable ids", async () => {
+  it("all 15 adapters have unique stable ids", async () => {
     const { ADAPTERS } = await import("../src/adapters/index.js");
     const ids = ADAPTERS.map((a) => a.id);
-    expect(ids.length).toBe(14);
-    expect(new Set(ids).size).toBe(14); // all unique
+    expect(ids.length).toBe(15);
+    expect(new Set(ids).size).toBe(15); // all unique
     // sanity: known ids present
     for (const expected of [
-      "claude-code", "cursor", "antigravity", "gemini-cli", "trae",
+      "claude-code", "cursor", "antigravity", "gemini-cli", "qoder", "trae",
       "vscode", "roo-code", "cline", "windsurf",
       "codebuddy", "qwen-code", "kimi-cli", "codex", "hermes",
     ]) {

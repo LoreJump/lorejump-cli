@@ -49,6 +49,10 @@ const IDE_OFFICIAL_DOCS: Record<string, string[]> = {
   antigravity: [
     "https://antigravity.google/docs/mcp",
   ],
+  qoder: [
+    "https://docs.qoder.com/zh/qoderwork/mcp",
+    "https://docs.qoder.com/zh/extensions/skills",
+  ],
   codebuddy: [
     "https://codebuddy.ai/docs/cli/mcp-servers",
   ],

@@ -3,6 +3,7 @@ import { claudeCode } from "./claude-code.js";
 import { cursor } from "./cursor.js";
 import { antigravity } from "./antigravity.js";
 import { geminiCli } from "./gemini-cli.js";
+import { qoder } from "./qoder.js";
 import { trae } from "./trae.js";
 import { vscode } from "./vscode.js";
 import { codex } from "./codex.js";
@@ -26,6 +27,7 @@ export const ADAPTERS: readonly Adapter[] = [
   cursor,
   antigravity,
   geminiCli,
+  qoder,
   trae,
   vscode,
   rooCode,
