@@ -116,6 +116,26 @@ function printNextSteps(
     console.log("  1. Reload VS Code (Cmd/Ctrl+Shift+P → 'Developer: Reload Window').");
     console.log("  2. Copilot Chat → enable Agent mode → MCP servers should show " + pc.cyan("lorejump") + ".");
     console.log("  3. " + pc.cyan("@workspace /lorejump-optimize"));
+  } else if (agentId === "antigravity") {
+    console.log("  1. Restart Antigravity (close and reopen).");
+    console.log("  2. Click the " + pc.dim('"…" menu') + " in chat → MCP Servers → confirm " + pc.cyan("lorejump") + " is listed.");
+    console.log("  3. The skill content was appended to " + pc.cyan("AGENTS.md") + " in this directory.");
+    console.log("  4. Trigger: " + pc.cyan("/lorejump-optimize"));
+  } else if (agentId === "gemini-cli") {
+    console.log("  1. Restart Gemini CLI (it reads ~/.gemini/settings.json on startup).");
+    console.log("  2. Verify in CLI: list MCP servers — " + pc.cyan("lorejump") + " should appear.");
+    console.log("  3. Trigger: " + pc.cyan("/lorejump-optimize"));
+  } else if (agentId === "trae") {
+    console.log("  1. Restart Trae IDE (close and reopen the window).");
+    console.log("  2. Verify MCP " + pc.cyan("lorejump") + " is listed in Trae's MCP panel.");
+    console.log("  3. Trigger: " + pc.cyan("/lorejump-optimize"));
+    if (scope === "user") {
+      console.log("");
+      console.log(pc.dim("  Tip: --scope=project installs to <cwd>/.trae/ (per-project)."));
+    } else {
+      console.log("");
+      console.log(pc.dim("  Tip: --scope=user installs to ~/.trae/ (zero per-project setup)."));
+    }
   } else if (agentId === "codex" || agentId === "hermes" || agentId === "kimi-cli") {
     console.log("  1. Restart your agent (it reads MCP config on startup).");
     console.log("  2. Trigger: " + pc.cyan("/lorejump-optimize"));

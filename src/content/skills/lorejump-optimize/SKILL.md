@@ -2,7 +2,7 @@
 name: lorejump-optimize
 description: 逻辑跃迁 AI 工作流诊断 — 拉 SOTA 画像、对照打分、给可执行方案、协助 apply、回报演化。零配置启动，多轮收尾。
 user-invocable: true
-version: 3.0
+version: 3.1
 ---
 
 你是逻辑跃迁（LoreJump）AI 工作流诊断执行剧本（v3.0）。**SOTA 画像、维度权重、最近实践都由 lorejump-mcp 的 `get_sota_pack` 一次拉齐**；你按语义对照、打分、给方案、协助 apply、回报。**不内嵌评分公式，不渲染 band 命名锁定，不做 cohort/percentile/expected_delta 数字**——它们违反 ADR-013 的 P3。
@@ -27,7 +27,7 @@ R3 session_close — Step 9：会话收尾总结 + submit_report(session_close, 
 3. **stack_signature**：拼接 `<lang>+<framework>+<runtime>`，如 `ts+astro+cf-workers`，缺则 `unknown`
 4. **Git**：`git log --oneline -20`（非 git → 标 D3 N/A）
 5. **历史**：读 `.lorejump/history.json`（可能不存在；含 `last_scan_report_id` 时一并备用）
-6. **project_fingerprint**：合并 has_claude_md / has_mcp / .claude/skills/* / .claude/hooks/* / claude_code_version
+6. **project_fingerprint**：合并 has_agent_instruction_file（任一：CLAUDE.md / AGENTS.md / GEMINI.md / .cursorrules / .github/copilot-instructions.md / .clinerules / .trae/user_rules.md / .qwen/QWEN.md）/ has_mcp / agent_skill_dirs[]（.claude/skills, .cursor/skills, .gemini/skills, .trae/skills, .qwen/skills 等任意命中）/ agent_hook_dirs[] / agent_id+version
 
 ## Step 2: 拉 SOTA pack（必需，一次调用）
 
@@ -118,7 +118,7 @@ agent 自查（推荐路径）：
   ],
   "agent_handoff": {
     "failed_check_ids": [...],
-    "skill_path": ".claude/skills/lorejump-optimize/SKILL.md",
+    "skill_path": "<dynamic — read from install-log.json targets[0].skill_paths[0]>",
     "ide_official_docs_for_handoff": [...URLs...],
     "lorejump_self_docs": [...URLs...]
   }
@@ -135,9 +135,9 @@ agent 自查（推荐路径）：
 | IDE (`agent_id`) | 应加的字段 |
 |---|---|
 | claude-code / cursor / kimi-cli / trae / windsurf / codebuddy / vscode | `"type": "http"` |
+| gemini-cli / antigravity / qwen-code | 字段名是 `"httpUrl": <url>`（**不是 `url`** — `url` 在 gemini 系是 SSE 专用） |
 | cline | `"type": "streamableHttp"` |
 | roo-code | `"type": "streamable-http"` |
-| qwen-code | 把 `url` 改名为 `httpUrl`（不是加字段，是改字段名） |
 | codex (TOML) / hermes (YAML) | 不加 type，依协议自动推断 |
 
 修完让用户**重启 IDE**（IDE 进程缓存旧配置），再跑一次 doctor。
@@ -298,7 +298,7 @@ self_confidence: med
   4) Y → agent 写文件（Edit / Write）
   5) skill → agent: 跑 verify
        - 改了 src/ 代码 → `pnpm typecheck` + `pnpm test`（若 script 存在）
-       - 改了 .claude/* → 重扫该维度（重跑 Step 3 仅该维度）
+       - 改了 agent 配置目录（.claude / .cursor / .gemini / .trae / .codex / .qwen / .clinerules 等）→ 重扫该维度（重跑 Step 3 仅该维度）
        - 改了文档 → 仅校验链接
   6) verify_status = pass | fail | mixed
   7) 写 .lorejump/history.json 最新 scan 的 applied_practice_keys[] 追加
@@ -403,6 +403,7 @@ frontmatter / body_md 进入 submit_report 前**必须**过滤：
 
 ## 变更日志
 
+- v3.1 (2026-05-09)：去 Claude 中心化。fingerprint 改为 has_agent_instruction_file（CLAUDE.md / AGENTS.md / GEMINI.md / .cursorrules 等等价物）；故障 A 表新增 gemini-cli / antigravity httpUrl 行；R2 重扫提示从 `.claude/*` 改为通用 agent 配置目录；doctor 示例 skill_path 改为动态从 install-log 读取。
 - v3.0 (2026-04-25)：ADR-013 重写。MCP 调用收敛到 `get_sota_pack` + `submit_report`；删 band×4 命名锁定；加 R1/R2/R3 三事件点回报；apply 后跑 verify；输出叙事优先。
 - v2.1 (2026-04-15)：skill 版本协商 + IP 中心化（rubric 由 server 下发）
 - v2.0 (2026-04-09)：Phase 3A v1 离线评分初版

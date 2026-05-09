@@ -42,6 +42,13 @@ const IDE_OFFICIAL_DOCS: Record<string, string[]> = {
   trae: [
     "https://docs.trae.ai/ide/model-context-protocol",
   ],
+  "gemini-cli": [
+    "https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md",
+    "https://geminicli.com/docs/tools/mcp-server/",
+  ],
+  antigravity: [
+    "https://antigravity.google/docs/mcp",
+  ],
   codebuddy: [
     "https://codebuddy.ai/docs/cli/mcp-servers",
   ],
@@ -154,7 +161,14 @@ export async function doctor(opts: DoctorOptions): Promise<void> {
     console.log(pc.dim("For agent-driven repair (recommended):"));
     console.log(pc.cyan("  lorejump doctor --json | <pipe to your AI agent>"));
     console.log(pc.dim("Or read the diagnostic decision tree in:"));
-    console.log(pc.cyan("  .claude/skills/lorejump-optimize/SKILL.md  (Step 2 error card)"));
+    const firstSkillPath =
+      log?.targets[0]?.skill_paths.find((p) => p.includes("lorejump-optimize")) ??
+      log?.targets[0]?.skill_paths[0];
+    console.log(
+      pc.cyan(
+        `  ${firstSkillPath ?? "<skill not installed — run lorejump install>"}  (Step 2 error card)`,
+      ),
+    );
     process.exitCode = 1;
   }
 }
@@ -476,6 +490,13 @@ function buildJsonReport(
     for (const u of IDE_OFFICIAL_DOCS[t.agent] ?? []) docsUrls.add(u);
   }
 
+  // Derive skill_path from install-log so Gemini CLI / Antigravity / etc. users
+  // see their actual install path, not a hardcoded .claude/* one.
+  const skillPath =
+    log?.targets[0]?.skill_paths.find((p) => p.includes("lorejump-optimize")) ??
+    log?.targets[0]?.skill_paths[0] ??
+    "<skill not installed>";
+
   return {
     schema: DOCTOR_SCHEMA_VERSION,
     cli_version: CLI_VERSION,
@@ -502,7 +523,7 @@ function buildJsonReport(
           ? "All checks passed. lorejump-mcp is reachable and exposes expected tools."
           : `${failed.length} of ${checks.length} checks failed. See checks[].observation + hypothesis. Decide repair from SKILL.md decision tree first; fall back to ide_official_docs_for_handoff for schema-drift cases.`,
       failed_check_ids: failed.map((c) => c.id),
-      skill_path: ".claude/skills/lorejump-optimize/SKILL.md",
+      skill_path: skillPath,
       skill_section: "诊断决策树",
       ide_official_docs_for_handoff: Array.from(docsUrls),
       lorejump_self_docs: LOREJUMP_SELF_DOCS,

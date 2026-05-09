@@ -14,10 +14,14 @@ import { mergeJsonEntry } from "../utils/json-merge.js";
  * MUST stay uppercase. CI runs on Linux to catch lowercase regressions
  * (case-sensitive filesystem turns a typo into a hard fail).
  *
- * Probe:    <cwd>/.trae/
- * Skill:    .trae/skills/<name>/SKILL.md  (literal uppercase)
- * MCP:      .trae/mcp.json
- * Root key: mcpServers
+ * Scopes (since v1.3+):
+ *   - user (default):  ~/.trae/skills/<name>/SKILL.md + ~/.trae/mcp.json
+ *   - project:         <cwd>/.trae/skills/<name>/SKILL.md + <cwd>/.trae/mcp.json
+ *
+ * The user-scope path matches the convention of ~/.trae/user_rules.md +
+ * ~/.trae/skills/ documented for Trae v1.3+. Probe accepts either marker.
+ *
+ * MCP root: mcpServers; HTTP transport: { type: "http", url }.
  */
 export const trae: Adapter = {
   id: "trae",
@@ -27,17 +31,21 @@ export const trae: Adapter = {
   mcpFormat: "json",
 
   async probe(ctx: AdapterContext): Promise<boolean> {
-    return existsSync(join(ctx.cwd, ".trae"));
+    return (
+      existsSync(join(ctx.cwd, ".trae")) ||
+      existsSync(join(ctx.homedir, ".trae"))
+    );
   },
 
   async installSkills(
     ctx: AdapterContext,
     skills: Record<SkillName, string>,
   ): Promise<string[]> {
+    const base = pickTraeBase(ctx);
     const written: string[] = [];
     for (const name of SKILL_NAMES) {
       // Filename must remain uppercase "SKILL.md" — Trae C2 schema trap.
-      const path = join(ctx.cwd, ".trae", "skills", name, "SKILL.md");
+      const path = join(base, "skills", name, "SKILL.md");
       await safeWrite(path, skills[name]);
       written.push(path);
     }
@@ -49,7 +57,8 @@ export const trae: Adapter = {
     name: string,
     entry: McpEntry,
   ): Promise<{ configPath: string; preservedExisting: string[] }> {
-    const configPath = join(ctx.cwd, ".trae", "mcp.json");
+    const base = pickTraeBase(ctx);
+    const configPath = join(base, "mcp.json");
     const result = await mergeJsonEntry({
       path: configPath,
       rootKey: "mcpServers",
@@ -60,3 +69,10 @@ export const trae: Adapter = {
     return { configPath, preservedExisting: result.preservedExisting };
   },
 };
+
+function pickTraeBase(ctx: AdapterContext): string {
+  // Default scope is user (~/.trae/) — zero-friction across projects, matches
+  // claude-code default. Use --scope=project to target <cwd>/.trae/.
+  if (ctx.scope === "project") return join(ctx.cwd, ".trae");
+  return join(ctx.homedir, ".trae");
+}

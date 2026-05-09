@@ -13,6 +13,9 @@ import { codebuddy } from "../src/adapters/codebuddy.js";
 import { vscode } from "../src/adapters/vscode.js";
 import { kimiCli } from "../src/adapters/kimi-cli.js";
 import { qwenCode } from "../src/adapters/qwen-code.js";
+import { geminiCli } from "../src/adapters/gemini-cli.js";
+import { antigravity } from "../src/adapters/antigravity.js";
+import { trae } from "../src/adapters/trae.js";
 import { codex } from "../src/adapters/codex.js";
 import { hermes } from "../src/adapters/hermes.js";
 import { mergeTomlEntry } from "../src/utils/toml-merge.js";
@@ -311,21 +314,179 @@ describe("hermes adapter (C2: YAML mcp_servers snake_case)", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
+// gemini-cli — ~/.gemini/settings.json + httpUrl (Streamable HTTP, NOT url=SSE)
+// ─────────────────────────────────────────────────────────────────────────
+describe("gemini-cli adapter (C2: httpUrl not url)", () => {
+  it("probes via project .gemini/", async () => {
+    await mkdir(join(tmp, ".gemini"), { recursive: true });
+    expect(await geminiCli.probe({ cwd: tmp, homedir: fakeHome })).toBe(true);
+  });
+
+  it("probes via user ~/.gemini/", async () => {
+    await mkdir(join(fakeHome, ".gemini"), { recursive: true });
+    expect(await geminiCli.probe({ cwd: tmp, homedir: fakeHome })).toBe(true);
+  });
+
+  it("writes skills under ~/.gemini/skills/<name>/SKILL.md (uppercase)", async () => {
+    const paths = await geminiCli.installSkills({ cwd: tmp, homedir: fakeHome }, FAKE_SKILLS);
+    for (const p of paths) {
+      expect(p).toMatch(/\/\.gemini\/skills\/lorejump-(optimize|harness)\/SKILL\.md$/);
+      expect(p.startsWith(fakeHome)).toBe(true);
+      expect(existsSync(p)).toBe(true);
+    }
+  });
+
+  it("MCP path is ~/.gemini/settings.json, entry uses 'httpUrl' field", async () => {
+    const result = await geminiCli.installMcp({ cwd: tmp, homedir: fakeHome }, "lorejump", { url: MCP_URL });
+    expect(result.configPath).toBe(join(fakeHome, ".gemini", "settings.json"));
+    const after = JSON.parse(await readFile(result.configPath, "utf-8"));
+    expect(after.mcpServers.lorejump.httpUrl).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.url).toBeUndefined(); // url=SSE in gemini convention
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// antigravity — ~/.gemini/antigravity/mcp_config.json + AGENTS.md fenced section
+// ─────────────────────────────────────────────────────────────────────────
+describe("antigravity adapter", () => {
+  it("probes via ~/.gemini/antigravity/", async () => {
+    await mkdir(join(fakeHome, ".gemini", "antigravity"), { recursive: true });
+    expect(await antigravity.probe({ cwd: tmp, homedir: fakeHome })).toBe(true);
+  });
+
+  it("does NOT probe just on plain ~/.gemini/", async () => {
+    await mkdir(join(fakeHome, ".gemini"), { recursive: true });
+    expect(await antigravity.probe({ cwd: tmp, homedir: fakeHome })).toBe(false);
+  });
+
+  it("writes skills as fenced sections in <cwd>/AGENTS.md", async () => {
+    const paths = await antigravity.installSkills({ cwd: tmp, homedir: fakeHome }, FAKE_SKILLS);
+    expect(paths).toEqual([join(tmp, "AGENTS.md")]);
+    const body = await readFile(paths[0]!, "utf-8");
+    expect(body).toContain("<!-- BEGIN LOREJUMP skill:lorejump-optimize -->");
+    expect(body).toContain("<!-- END LOREJUMP skill:lorejump-optimize -->");
+    expect(body).toContain("<!-- BEGIN LOREJUMP skill:lorejump-harness -->");
+    expect(body).toContain("<!-- END LOREJUMP skill:lorejump-harness -->");
+    expect(body).toContain(FAKE_SKILLS["lorejump-optimize"].trim());
+  });
+
+  it("preserves user-edited content above/below fenced sections on re-install", async () => {
+    const agentsMd = join(tmp, "AGENTS.md");
+    await writeFile(agentsMd, "# My Project Rules\n\nDon't break the build.\n");
+    await antigravity.installSkills({ cwd: tmp, homedir: fakeHome }, FAKE_SKILLS);
+    const body = await readFile(agentsMd, "utf-8");
+    expect(body).toContain("# My Project Rules");
+    expect(body).toContain("Don't break the build.");
+    expect(body).toContain("<!-- BEGIN LOREJUMP skill:lorejump-optimize -->");
+    // Re-install should be idempotent (no duplicate fences).
+    await antigravity.installSkills({ cwd: tmp, homedir: fakeHome }, FAKE_SKILLS);
+    const after = await readFile(agentsMd, "utf-8");
+    const beginCount = (after.match(/<!-- BEGIN LOREJUMP skill:lorejump-optimize -->/g) ?? []).length;
+    expect(beginCount).toBe(1);
+  });
+
+  it("MCP path is ~/.gemini/antigravity/mcp_config.json with httpUrl field", async () => {
+    const result = await antigravity.installMcp({ cwd: tmp, homedir: fakeHome }, "lorejump", { url: MCP_URL });
+    expect(result.configPath).toBe(
+      join(fakeHome, ".gemini", "antigravity", "mcp_config.json"),
+    );
+    const after = JSON.parse(await readFile(result.configPath, "utf-8"));
+    expect(after.mcpServers.lorejump.httpUrl).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.url).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// trae — user scope (~/.trae/) is now default, project scope (.trae/) opt-in
+// ─────────────────────────────────────────────────────────────────────────
+describe("trae adapter (user scope default + project scope via flag)", () => {
+  it("probes via project .trae/", async () => {
+    await mkdir(join(tmp, ".trae"), { recursive: true });
+    expect(await trae.probe({ cwd: tmp, homedir: fakeHome })).toBe(true);
+  });
+
+  it("probes via user ~/.trae/", async () => {
+    await mkdir(join(fakeHome, ".trae"), { recursive: true });
+    expect(await trae.probe({ cwd: tmp, homedir: fakeHome })).toBe(true);
+  });
+
+  it("default scope (user) writes to ~/.trae/skills/<name>/SKILL.md", async () => {
+    const paths = await trae.installSkills({ cwd: tmp, homedir: fakeHome }, FAKE_SKILLS);
+    for (const p of paths) {
+      expect(p).toMatch(/\/\.trae\/skills\/lorejump-(optimize|harness)\/SKILL\.md$/);
+      expect(p.startsWith(fakeHome)).toBe(true);
+    }
+  });
+
+  it("explicit user scope writes to ~/.trae/", async () => {
+    const paths = await trae.installSkills(
+      { cwd: tmp, homedir: fakeHome, scope: "user" },
+      FAKE_SKILLS,
+    );
+    for (const p of paths) {
+      expect(p.startsWith(fakeHome)).toBe(true);
+    }
+  });
+
+  it("project scope writes to <cwd>/.trae/", async () => {
+    const paths = await trae.installSkills(
+      { cwd: tmp, homedir: fakeHome, scope: "project" },
+      FAKE_SKILLS,
+    );
+    for (const p of paths) {
+      expect(p.startsWith(tmp)).toBe(true);
+      expect(p).toMatch(/\/\.trae\/skills\/lorejump-(optimize|harness)\/SKILL\.md$/);
+    }
+  });
+
+  it("MCP user-scope writes ~/.trae/mcp.json with type:http", async () => {
+    const result = await trae.installMcp(
+      { cwd: tmp, homedir: fakeHome, scope: "user" },
+      "lorejump",
+      { url: MCP_URL },
+    );
+    expect(result.configPath).toBe(join(fakeHome, ".trae", "mcp.json"));
+    const after = JSON.parse(await readFile(result.configPath, "utf-8"));
+    expect(after.mcpServers.lorejump.url).toBe(MCP_URL);
+    expect(after.mcpServers.lorejump.type).toBe("http");
+  });
+
+  it("MCP project-scope writes <cwd>/.trae/mcp.json", async () => {
+    const result = await trae.installMcp(
+      { cwd: tmp, homedir: fakeHome, scope: "project" },
+      "lorejump",
+      { url: MCP_URL },
+    );
+    expect(result.configPath).toBe(join(tmp, ".trae", "mcp.json"));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
 // Cross-cutting: ADAPTERS array shape
 // ─────────────────────────────────────────────────────────────────────────
 describe("adapter registry shape", () => {
-  it("all 12 adapters have unique stable ids", async () => {
+  it("all 14 adapters have unique stable ids", async () => {
     const { ADAPTERS } = await import("../src/adapters/index.js");
     const ids = ADAPTERS.map((a) => a.id);
-    expect(ids.length).toBe(12);
-    expect(new Set(ids).size).toBe(12); // all unique
+    expect(ids.length).toBe(14);
+    expect(new Set(ids).size).toBe(14); // all unique
     // sanity: known ids present
     for (const expected of [
-      "claude-code", "cursor", "trae",
+      "claude-code", "cursor", "antigravity", "gemini-cli", "trae",
       "vscode", "roo-code", "cline", "windsurf",
       "codebuddy", "qwen-code", "kimi-cli", "codex", "hermes",
     ]) {
       expect(ids).toContain(expected);
     }
+  });
+
+  it("antigravity is ordered before gemini-cli in probe sequence", async () => {
+    const { ADAPTERS } = await import("../src/adapters/index.js");
+    const ids = ADAPTERS.map((a) => a.id);
+    const agIdx = ids.indexOf("antigravity");
+    const gcIdx = ids.indexOf("gemini-cli");
+    expect(agIdx).toBeGreaterThanOrEqual(0);
+    expect(gcIdx).toBeGreaterThanOrEqual(0);
+    expect(agIdx).toBeLessThan(gcIdx);
   });
 });

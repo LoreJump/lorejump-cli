@@ -1,6 +1,8 @@
 import type { Adapter } from "./_types.js";
 import { claudeCode } from "./claude-code.js";
 import { cursor } from "./cursor.js";
+import { antigravity } from "./antigravity.js";
+import { geminiCli } from "./gemini-cli.js";
 import { trae } from "./trae.js";
 import { vscode } from "./vscode.js";
 import { codex } from "./codex.js";
@@ -14,10 +16,16 @@ import { hermes } from "./hermes.js";
 
 // Probe order matters: more specific markers come first so a dual-agent
 // repo (e.g. .roo/ + .clinerules/ both present) prefers the more specific
-// agent. claude-code/cursor/trae are top-tier so they probe first.
+// agent. claude-code/cursor are top-tier so they probe first.
+//
+// antigravity MUST come BEFORE gemini-cli — they both root under ~/.gemini/,
+// but Antigravity has its own ~/.gemini/antigravity/ subdir which is a
+// stricter marker. If a user has both, Antigravity wins.
 export const ADAPTERS: readonly Adapter[] = [
   claudeCode,
   cursor,
+  antigravity,
+  geminiCli,
   trae,
   vscode,
   rooCode,

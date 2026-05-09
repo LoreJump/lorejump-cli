@@ -1,6 +1,6 @@
 # @lorejump/cli
 
-Cross-platform installer for LoreJump skill + MCP. One command across Claude Code, Cursor, Trae, VS Code, Codex CLI, Windsurf, Qwen Code, Kimi-CLI, Hermes, CodeBuddy, OpenClaw, Cline/Roo Code — and a handoff mode for everything else.
+Cross-platform installer for LoreJump skill + MCP. One command across Claude Code, Cursor, Trae, VS Code, Codex CLI, Windsurf, Qwen Code, Kimi-CLI, Gemini CLI, Antigravity, Hermes, CodeBuddy, OpenClaw, Cline/Roo Code — and a handoff mode for everything else.
 
 > Status: scaffold. v1 in active development. See [`docs/specs/cli-installer/spec.md`](https://github.com/LoreJump/lorejump-cli/blob/main/docs/specs/cli-installer/spec.md) once published.
 
@@ -28,9 +28,15 @@ lorejump update             # Refresh installed SKILL.md to latest CLI-shipped c
 
 ## Supported agents (v1 preset)
 
-Claude Code · OpenClaw · Cursor · Trae · CodeBuddy · VS Code · Codex CLI · Windsurf · Qwen Code · Kimi-CLI · Hermes · Cline / Roo Code
+Claude Code · OpenClaw · Cursor · Antigravity · Gemini CLI · Trae · CodeBuddy · VS Code · Codex CLI · Windsurf · Qwen Code · Kimi-CLI · Hermes · Cline / Roo Code
 
 Other agents → handoff mode (CLI emits `/tmp/lorejump-handoff/INSTALL.md`, your agent finishes the install).
+
+## Known limitations
+
+- **MiniMax agent** (Hailuo / 海螺): the consumer chat product currently exposes no UI for adding a third-party MCP server. This is a client limitation, not a LoreJump one — wait for MiniMax to ship user-side custom MCP support, or use any of the supported agents above for now.
+- **Antigravity skill**: Antigravity has no native skill directory yet. The CLI installs LoreJump skills as appended fenced blocks in `<cwd>/AGENTS.md` (Antigravity's official instruction layer). User-edited content above the fenced block is preserved on `lorejump update`.
+- **Trae user scope**: Trae supports `~/.trae/skills/` + `~/.trae/mcp.json` (user-global) since v1.3+. Use `--scope=user` to install there; default is project-scope at `<cwd>/.trae/`.
 
 ## License
 
