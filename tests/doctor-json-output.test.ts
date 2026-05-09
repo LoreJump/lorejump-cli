@@ -54,7 +54,9 @@ describe("doctor --json output (lorejump-doctor-v1)", () => {
     expect(Array.isArray(report.checks)).toBe(true);
     expect(report.checks).toHaveLength(0);
     expect(report.agent_handoff).toBeDefined();
-    expect(report.agent_handoff.skill_path).toContain("SKILL.md");
+    // No install-log → skill_path falls back to a sentinel string, NOT a
+    // fake .claude/skills/* path (was the old hardcoded behavior — now fixed).
+    expect(report.agent_handoff.skill_path).toBe("<skill not installed>");
     expect(Array.isArray(report.agent_handoff.lorejump_self_docs)).toBe(true);
 
     await rm(tmp, { recursive: true, force: true });
