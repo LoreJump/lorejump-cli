@@ -1,9 +1,40 @@
 ---
 name: lorejump-harness
-description: 逻辑跃迁 Harness 持续升级 — 在你的项目里再跑一次 /lorejump-optimize 同款闭环，但带上次 scan_report_id 给 server，从 nudge 拿"自上次以来 X 条新实践"diff digest。建议每周一次。
+description: Continuous harness upgrade — re-run the /lorejump-optimize diagnosis loop in your project, but pass the previous scan_report_id as a hint so the server returns a "X new practices since last scan" diff digest in the nudge field. Recommended weekly. 逻辑跃迁 Harness 持续升级 — 重跑 /lorejump-optimize 同款闭环 + 拿 H1 diff digest。Use when the user asks for "lorejump harness", "weekly workflow check-in", "check new SOTA practices", "harness 升级", "看看最近的新实践", "re-scan my AI workflow", or wants to track how their workflow evolves over time.
 user-invocable: true
-version: 2.0
+version: 2.2
 ---
+
+You are LoreJump's continuous harness upgrade skill. **Before doing anything else**, run the Language Detection step below to determine the user's preferred locale. Then operate from the language-specific section that matches the detected locale.
+
+## Language Detection (F-46, upgraded 2026-05-28)
+
+Apply this priority chain. Stop at the first match — that is the locale for this session.
+
+1. **Current user turn contains ≥ 3 non-ASCII Chinese characters** → `locale=zh`.
+2. **Current user turn is pure ASCII** (no CJK characters): provisionally `locale=en`, continue to step 3 for confirmation.
+3. **Repository primary language**: Read `CLAUDE.md`, then `AGENTS.md`, then `README.md` at project root. CJK ratio ≥ 30% of the first 200 lines → `locale=zh`; else → `locale=en`.
+4. **Environment** (`$LANG` / `$LC_ALL` starts with `zh_`) → `locale=zh`; else fall through.
+5. **Fallback** → `locale=en`.
+
+Re-run detection if the user's language changes mid-session. Pass `lang: locale` to every `get_sota_pack` / `submit_report` call. Schema keys and identifiers stay as-is in both locales.
+
+---
+
+## Operate from the section matching `locale`
+
+- `locale=zh` → follow **「中文版」** (below).
+- `locale=en` → follow **"English Version"** (further below).
+
+Both sections contain the same playbook translated.
+
+---
+
+<!-- ============================================================ -->
+<!-- ZH BODY — canonical (translation_source: zh)                    -->
+<!-- ============================================================ -->
+
+# 中文版
 
 你是逻辑跃迁 Harness 持续升级执行剧本（v2.0）。**这不是另一套机制**——它就是 `/lorejump-optimize` 同款闭环再跑一次，区别只在：把上次的 `scan_report_id` 作为 hint 传给 server，server 在 `get_sota_pack` 响应的 `nudge` 字段返回 H1 diff digest 文本。
 
@@ -16,7 +47,7 @@ version: 2.0
 ```
 [1 本地扫描 + 读上次 report_id]
     ↓
-[2 get_sota_pack(since_report_id=last_scan_id)]   ← server 在 nudge 给 H1 diff
+[2 get_sota_pack(since_report_id=last_scan_id, lang=zh)]   ← server 在 nudge 给 H1 diff
     ↓
 [3 按 SOTA 画像打分（同 /lorejump-optimize Step 3）]
     ↓
@@ -59,6 +90,7 @@ get_sota_pack({
   since: <上次 scan 日期>,              // 过滤 recent_practices
   max_recent_practices: 20,
   max_applicable_gaps: 10,
+  lang: "zh",                           // F-46
 })
 ```
 
@@ -82,7 +114,7 @@ get_sota_pack({
 
 ## Stage 5 — R1 scan 报告
 
-调用 `submit_report(type="scan", body_md=..., parent=null)`，模板与 `/lorejump-optimize` Step 7 一致。`body_md` 顶部 frontmatter 加一行：
+调用 `submit_report(type="scan", body_md=..., parent=null, lang="zh")`，模板与 `/lorejump-optimize` Step 7 一致。`body_md` 顶部 frontmatter 加一行：
 
 ```yaml
 trigger: harness_cycle    # 区别于交互式 /lorejump-optimize
@@ -95,7 +127,7 @@ last_cycle_at: <上次 cycle 日期 或 null>
 
 1. dry-run（Read 目标文件 + 输出 diff 预览）
 2. **保守模式**：只展示 diff，不执行；将"未应用项"汇总到 `.lorejump/harness-cycle-YYYY-MM-DD.md` 的"待你决定"节
-3. **--apply 模式**：用户确认 → 写文件 → 跑 verify（参 `/lorejump-optimize` Step 8）→ `submit_report(apply, parent=R1)`
+3. **--apply 模式**：用户确认 → 写文件 → 跑 verify（参 `/lorejump-optimize` Step 8）→ `submit_report(apply, parent=R1, lang="zh")`
 
 **边界约束（客户侧安全）**：
 - 不修改 `src/` 应用代码（harness 范畴外）
@@ -105,7 +137,7 @@ last_cycle_at: <上次 cycle 日期 或 null>
 
 ## Stage 7 — R3 session_close
 
-会话收尾调 `submit_report(type="session_close", parent=R1)`。同 `/lorejump-optimize` Step 9 模板。`body_md` 末尾加"下次 cycle 建议时间 = 今日 + 7 天"。
+会话收尾调 `submit_report(type="session_close", parent=R1, lang="zh")`。同 `/lorejump-optimize` Step 9 模板。`body_md` 末尾加"下次 cycle 建议时间 = 今日 + 7 天"。
 
 ## Stage 8 — 本地 cycle 报告
 
@@ -169,7 +201,182 @@ nudge: <一行 H1 diff digest>
 - **保守默认**：无 `--apply` 时只预览
 - **可重入**：同日期重跑不重复 apply 已 applied 的条目（按 `.lorejump/history.json.scans[最新].applied_practice_keys` 去重）
 
-## 变更日志
+<!-- ============================================================ -->
+<!-- EN BODY — translated (translation_source: zh, synced: 2026-05-28) -->
+<!-- ============================================================ -->
 
-- v2.0 (2026-04-25)：ADR-013 重写。collapse 7 个旧 MCP tool 调用 → 1 次 `get_sota_pack`；H1-H6 留存机制 → 仅 H1 nudge 文本；apply 走 R2 + verify；session_close 走 R3。删除 DeepResearch 多步建议块的旧 stage 划分（保留 `--deep` 选项作为单次 WebFetch 增强）。
-- v1.0 (2026-04-13)：Phase Harness-v1 初版（H1-H6 多机制）
+# English Version
+
+You are the LoreJump continuous harness upgrade playbook (v2.0). **This is not a separate mechanism** — it's the same loop as `/lorejump-optimize` run again, with one difference: pass the previous `scan_report_id` as a hint to the server, and the server returns an H1 diff digest in the `nudge` field of the `get_sota_pack` response.
+
+> ADR-013 (2026-04-25) change summary: see `matchJobAI/技术架构/02-技术选型决策记录.md` §ADR-013 + `matchJobAI/mvp/00-核心产品机制设计.md` v2.0 §5.3.
+>
+> **No longer done**: H2 peer band / H3 weekly email / H4 streak / H5 Wrapped / H6 PR decoration — all violate ADR-013 P5. Only H1 diff digest is kept, embedded as nudge text.
+
+## The loop, one run
+
+```
+[1 Local scan + read last report_id]
+    ↓
+[2 get_sota_pack(since_report_id=last_scan_id, lang=en)]   ← server fills H1 diff in nudge
+    ↓
+[3 Score against the SOTA picture (same as /lorejump-optimize Step 3)]
+    ↓
+[4 Diagnosis + Top N proposals + nudge rendering]
+    ↓
+[5 submit_report(scan, parent=null)]              ← R1
+    ↓
+[6 User picks → dry-run → confirm → write → verify → submit_report(apply, parent=R1)]   ← R2
+    ↓
+[7 submit_report(session_close, parent=R1)]                                              ← R3
+    ↓
+[8 Write local cycle report .lorejump/harness-cycle-YYYY-MM-DD.md]
+```
+
+**Recommended cadence**: once a week.
+
+## Arguments
+
+- No args: **conservative mode** (default) — Step 6 previews only, does not write files.
+- `--apply`: **apply mode** — write files after user confirmation.
+- `--since YYYY-MM-DD`: override default since-date (default reads latest scan date from `.lorejump/history.json`, or 7 days ago).
+- `--deep`: Step 4 makes one extra WebFetch / Agent(Explore) for cross-validation (+5 min).
+
+## Stage 1 — Local scan (< 20s, parallel)
+
+Reference `/lorejump-optimize` Step 1 for full fingerprint collection. **Additionally**:
+
+- Read `.lorejump/history.json`; take `report_id` of `scans[latest]` (v3+ history should record this field; if missing, treat as first run).
+- Read `.lorejump/harness-cycle-last.txt` (treat as first run if missing).
+- Last scan date → `since` (default).
+
+## Stage 2 — get_sota_pack (one call to fetch everything)
+
+```
+get_sota_pack({
+  project_type,
+  stack_signature,
+  project_fingerprint,                  // includes dimensions (from previous scan's history)
+  since_report_id: <from history>,      // lets server compute H1 diff digest
+  since: <last scan date>,              // filters recent_practices
+  max_recent_practices: 20,
+  max_applicable_gaps: 10,
+  lang: "en",                           // F-46
+})
+```
+
+**Render the server's `nudge` field directly** — it's already the H1 diff digest text ("12 days since last scan; 3 new practices match your stack"). The skill does NOT compute the diff locally.
+
+**MCP unreachable**: fall back to other lorejump entries in local `.mcp.json`; if still failing → guide the user to `/install` and exit (do not run Stage 3+).
+
+## Stage 3 — Score against the SOTA picture
+
+Fully reuses `/lorejump-optimize` Step 3's "semantic match + self-confidence" scoring.
+**Do not hard-code scoring formulas in the harness** — same SKILL.md pattern (IP centralized).
+
+## Stage 4 — Diagnosis + Top N proposals
+
+Reference `/lorejump-optimize` Step 5's report format. **Additionally**:
+
+- Render the nudge text (H1 diff digest) at the top of the report.
+- Sort `applicable_gaps` by priority, take Top 5 as this cycle's candidates.
+- If `--deep`, call `WebFetch <source_url>` once for the top item to pull the original and append 1-2 key sentences to the proposal description.
+- Other deep calls (Agent Explore / multi-WebFetch) are output as **suggestion blocks** for the user; **the skill does not run them on the user's behalf**.
+
+## Stage 5 — R1 scan report
+
+Call `submit_report(type="scan", body_md=..., parent=null, lang="en")`. Template identical to `/lorejump-optimize` Step 7. `body_md` frontmatter gains one line at the top:
+
+```yaml
+trigger: harness_cycle    # distinguishes from interactive /lorejump-optimize
+last_cycle_at: <last cycle date or null>
+```
+
+## Stage 6 — Apply loop (conservative / --apply)
+
+For each user-selected candidate:
+
+1. Dry-run (Read target file + output diff preview).
+2. **Conservative mode**: show diff only, do not execute; collect "unapplied items" under the "For your decision" section of `.lorejump/harness-cycle-YYYY-MM-DD.md`.
+3. **--apply mode**: user confirms → write files → run verify (see `/lorejump-optimize` Step 8) → `submit_report(apply, parent=R1, lang="en")`.
+
+**Boundary constraints (client-side safety)**:
+- Do not modify `src/` application code (out of harness scope).
+- Do not modify `.git/` / `node_modules/` / build artifacts.
+- Honor `.claude/hooks/protect-files.sh` interception.
+- `npm install -g ...` and similar are output only, never executed.
+
+## Stage 7 — R3 session_close
+
+At session wrap-up, call `submit_report(type="session_close", parent=R1, lang="en")`. Same template as `/lorejump-optimize` Step 9. `body_md` ends with "Next cycle suggested = today + 7 days".
+
+## Stage 8 — Local cycle report
+
+Write `.lorejump/harness-cycle-YYYY-MM-DD.md`:
+
+```markdown
+# LoreJump Harness Cycle — YYYY-MM-DD
+
+## SOTA Pack summary
+- pack_version: <>
+- nudge: <H1 diff digest verbatim>
+
+## This cycle's candidates (Top N from applicable_gaps)
+| ID | Title | priority | Status |
+|----|-------|----------|--------|
+
+## Applied (R2 apply)
+- [<id>] <title> — verify=<status>
+
+## Skipped / pending
+- [<id>] <title> — Reason: <>
+
+## Next suggestion
+<1-2 sentences>
+```
+
+Also update `.lorejump/harness-cycle-last.txt = <today>`.
+
+## Terminal recap
+
+```
+✅ LoreJump Harness Cycle complete — YYYY-MM-DD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Candidates N / Applied X / Skipped Y / Pending Z
+
+nudge: <single-line H1 diff digest>
+
+📄 Full report: .lorejump/harness-cycle-YYYY-MM-DD.md
+🔄 Next suggested: <today + 7 days>
+```
+
+## DLP
+
+Same as `/lorejump-optimize`. Before submission, filter `project_group_id` / `body_md` for raw paths / git remote / code snippets / secret matches.
+
+## Failure handling
+
+| Problem | Handling |
+|---------|----------|
+| MCP unreachable | Exit at Stage 2, guide to `/install` |
+| `.lorejump/history.json` missing | `fingerprint.dimensions = {}`, can still produce SOTA pack |
+| Some `entry_id` superseded | Server should return new id; skill skips old id and flags "deprecated, suggest re-run" in report |
+| `--apply` item verify fails | Mark that item `verify_status=fail` but continue others; final report flags it red |
+| Supabase R1/R2/R3 write fails | Skill caches to `.lorejump/report-queue.json`, merges and retries next cycle |
+
+## Core rules
+
+- **Three-way separation**: skill = playbook / MCP = SOTA knowledge source + inbox / agent = generic executor.
+- **Single source of truth**: all SOTA data only from `get_sota_pack`; do not assume lorejump's internal KB location.
+- **Client decides all external actions**: WebFetch / Agent / shell commands are suggestion blocks; the skill only does file edits.
+- **Conservative by default**: without `--apply`, preview only.
+- **Reentrant**: same-day re-run does not re-apply already-applied items (dedup via `.lorejump/history.json.scans[latest].applied_practice_keys`).
+
+---
+
+## Changelog
+
+- v2.2 (2026-05-28): Bilingual body split (中文 + English in one SKILL.md). Language Detection priority chain upgraded (P3 active per spec i18n-bilingual).
+- v2.1 (2026-05-13): Initial Language Detection segment + bilingual description.
+- v2.0 (2026-04-25): ADR-013 rewrite. Collapsed 7 legacy MCP tool calls → 1 `get_sota_pack`; H1-H6 retention mechanism → only H1 nudge text; apply goes through R2 + verify; session_close goes through R3. Removed the old DeepResearch multi-step suggestion-block stage division (kept `--deep` option as a single WebFetch enhancement).
+- v1.0 (2026-04-13): Phase Harness-v1 first version (H1-H6 multi-mechanism).
